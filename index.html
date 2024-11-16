@@ -3,132 +3,85 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Documentation for the Blender Addon">
-    <title>Blender Addon Documentation</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            line-height: 1.6;
-            background-color: #f4f4f9;
-            color: #333;
-        }
+    <title>My Addon Documentation</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/theme_extra.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.5.0/styles/github.min.css">
 
-        header {
-            background: #222;
-            color: #fff;
-            padding: 1rem 0;
-            text-align: center;
-        }
-
-        header h1 {
-            margin: 0;
-        }
-
-        nav {
-            background: #444;
-            color: #fff;
-            padding: 0.5rem;
-            text-align: center;
-        }
-
-        nav a {
-            color: #fff;
-            margin: 0 1rem;
-            text-decoration: none;
-        }
-
-        nav a:hover {
-            text-decoration: underline;
-        }
-
-        main {
-            padding: 2rem;
-        }
-
-        section {
-            margin-bottom: 2rem;
-        }
-
-        section h2 {
-            color: #222;
-            border-bottom: 2px solid #444;
-            padding-bottom: 0.5rem;
-        }
-
-        footer {
-            background: #222;
-            color: #fff;
-            text-align: center;
-            padding: 1rem 0;
-            margin-top: 2rem;
-        }
-    </style>
+    <!-- JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.5.0/highlight.min.js" defer></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            hljs.highlightAll();
+        });
+    </script>
 </head>
 
 <body>
-    <header>
-        <h1>Blender Addon Documentation</h1>
-        <p>Comprehensive guide to help you use and customize the addon.</p>
-    </header>
+    <div class="wy-grid-for-nav">
+        <!-- Sidebar Navigation -->
+        <nav class="wy-nav-side stickynav">
+            <div class="wy-side-scroll">
+                <div class="wy-side-nav-search">
+                    <a href="index.html" class="icon icon-home"> My Addon</a>
+                </div>
+                <div class="wy-menu wy-menu-vertical" role="navigation" aria-label="main navigation">
+                    <ul>
+                        <li class="toctree-l1"><a href="quick-setup.html">Quick Setup</a></li>
+                        <li class="toctree-l1"><a href="installation.html">Installation</a></li>
+                        <li class="toctree-l1"><a href="usage.html">Usage</a></li>
+                        <li class="toctree-l1"><a href="faq.html">FAQ</a></li>
+                        <li class="toctree-l1"><a href="credits.html">Credits</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
 
-    <nav>
-        <a href="#introduction">Introduction</a>
-        <a href="#installation">Installation</a>
-        <a href="#usage">Usage</a>
-        <a href="#faq">FAQ</a>
-        <a href="#credits">Credits</a>
-    </nav>
-
-    <main>
-        <section id="introduction">
-            <h2>Introduction</h2>
-            <p>Welcome to the Blender Addon documentation! This guide will walk you through the features, installation process, and usage of the addon.</p>
+        <!-- Main Content -->
+        <section class="wy-nav-content-wrap">
+            <nav class="wy-nav-top">
+                <a href="index.html">My Addon</a>
+            </nav>
+            <div class="wy-nav-content">
+                <div class="rst-content">
+                    <!-- Breadcrumb -->
+                    <ul class="wy-breadcrumbs">
+                        <li><a href="index.html">Docs</a> »</li>
+                        <li>Quick Setup</li>
+                    </ul>
+                    <hr>
+                    
+                    <!-- Main Documentation Section -->
+                    <div class="section">
+                        <h1>Quick Setup</h1>
+                        <p>Welcome to the documentation! This section provides a quick overview of setting up the addon.</p>
+                        <h2>Step 1: Installation</h2>
+                        <ul>
+                            <li>Download the addon from the GitHub repository.</li>
+                            <li>Install it via Blender's Preferences > Add-ons menu.</li>
+                        </ul>
+                        <h2>Step 2: Configuration</h2>
+                        <p>Customize the addon settings to suit your workflow.</p>
+                    </div>
+                </div>
+            </div>
         </section>
-
-        <section id="installation">
-            <h2>Installation</h2>
-            <p>To install the addon:</p>
-            <ol>
-                <li>Download the addon ZIP file from the <a href="https://github.com/your-repo" target="_blank">GitHub repository</a>.</li>
-                <li>Open Blender and go to <strong>Edit > Preferences > Add-ons</strong>.</li>
-                <li>Click <strong>Install</strong>, select the downloaded ZIP file, and click <strong>Install Add-on</strong>.</li>
-                <li>Enable the addon in the list.</li>
-            </ol>
-        </section>
-
-        <section id="usage">
-            <h2>Usage</h2>
-            <p>After installation, you can access the addon features by navigating to:</p>
-            <ul>
-                <li><strong>Menu Path:</strong> Where to find it in the UI.</li>
-                <li><strong>Hotkeys:</strong> Any shortcuts you can use.</li>
-                <li><strong>Functionality:</strong> Detailed explanation of the addon’s functionality.</li>
-            </ul>
-            <pre>
-Example code block if needed
-print("Hello Blender!")
-            </pre>
-        </section>
-
-        <section id="faq">
-            <h2>FAQ</h2>
-            <p><strong>Q: How do I update the addon?</strong></p>
-            <p>A: Download the latest version from the GitHub repository and repeat the installation process.</p>
-            <p><strong>Q: Is this addon compatible with all Blender versions?</strong></p>
-            <p>A: This addon is tested with Blender 3.0 and above. Older versions may not be supported.</p>
-        </section>
-
-        <section id="credits">
-            <h2>Credits</h2>
-            <p>Developed by <a href="https://github.com/your-profile" target="_blank">Your Name</a>. Contributions and feedback are welcome!</p>
-        </section>
-    </main>
+    </div>
 
     <footer>
-        <p>© 2024 Your Name. Hosted on <a href="https://pages.github.com/" target="_blank">GitHub Pages</a>.</p>
+        <div class="rst-footer-buttons">
+            <a href="usage.html" class="btn btn-neutral">Next »</a>
+        </div>
+        <hr>
+        <p>Built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
     </footer>
 </body>
 
