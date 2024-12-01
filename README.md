@@ -4,8 +4,9 @@
 
 HAS Paint Layers is a free tool for artists who want a non-destructive workflow with textures. It is especially useful for artists focusing on hand-painted textures and fast editing, while still being highly effective for creating PBR (Physically Based Rendering) textures. It provides layers, paint tools, fast baking, filters, and more.
 
-# Installation
-To get started, download the latest version on releases page https://github.com/Hirourk/HASPaintLayers/releases
+## Installation
+To get started, download the latest version on releases page [Releases](https://github.com/Hirourk/HASPaintLayers/releases)
+or from [Gumroad](https://hirourk.gumroad.com/l/haspaintlayers)
 
 Then, open Blender and go to Edit -> Preferences -> Add-ons. Click on Install and select the downloaded file.
 
@@ -13,6 +14,6 @@ Once installed, you will see the HAS Paint panel in the 3D viewport, ready to us
 
 Add-on tested on 3.1, 3.6, 4.0, 4.2 Blender versions
 
-# Tutorials
+## Tutorials
 For now there is only Wiki, it always updated to current version. 
 https://hirourk.github.io/HASPaintLayersWiki/index
