@@ -21,7 +21,7 @@ bl_info = {
     "name": "HAS Paint Layers",
     "blender": (3, 1, 0),
     "category": "Paint",
-    "version": (0, 8, 1),
+    "version": (0, 8, 2),
     "description": "Layers for texture painting",
     "author": "Hirourk",
     "location": "View3D > Tool Shelf > Paint Layers",
@@ -1428,17 +1428,101 @@ class ViewData(PropertyGroup):
 ### Presets
 ###
 
-addon_folder = os.path.dirname(__file__)
-preset_folder = os.path.join(addon_folder, 'haspresets', 'savepres')
-
+preset_folder = bpy.utils.user_resource('SCRIPTS',path=  "presets/haspresets/savedpresets", create=False)
 if not os.path.exists(preset_folder):
     os.makedirs(preset_folder)
-initial_file = os.path.join(preset_folder, "UE5.py")
-if not os.path.isfile(initial_file):
-    with open(initial_file, "w") as f:
-        f.write("# Default preset file\n")
-        f.write("# Add your custom settings here.\n")
+initial_file = os.path.join(preset_folder, "Packed.py")
+try:
+    if not os.path.isfile(initial_file):
+        with open(initial_file, "w") as f:
+            f.write("import bpy\n")
+            f.write("scene = bpy.context.scene\n")
+            f.write("op = bpy.context.scene.other_props.exportprops\n")
 
+            f.write("scene.other_props.height_to_normal = True\n")
+            f.write("scene.other_props.invert_green_n = False\n")
+            f.write("op[0].type = 'RGB_A'\n")
+            f.write("op[0].RGB = 'DIFFUSE'\n")
+            f.write("op[0].R = 'METALLIC'\n")
+            f.write("op[0].G = 'ROUGHNESS'\n")
+            f.write("op[0].B = 'HEIGHT'\n")
+            f.write("op[0].A = 'ALPHA'\n")
+            f.write("op[0].save_name = '(mtl)_Diffuse'\n")
+            f.write("op[1].type = 'R_G_B_A'\n")
+            f.write("op[1].RGB = 'ROUGHNESS'\n")
+            f.write("op[1].R = 'ROUGHNESS'\n")
+            f.write("op[1].G = 'METALLIC'\n")
+            f.write("op[1].B = 'AO'\n")
+            f.write("op[1].A = 'EMPTY'\n")
+            f.write("op[1].save_name = '(mtl)_RMO'\n")
+            f.write("op[2].type = 'RGB'\n")
+            f.write("op[2].RGB = 'NORMAL'\n")
+            f.write("op[2].R = 'EMPTY'\n")
+            f.write("op[2].G = 'EMPTY'\n")
+            f.write("op[2].B = 'EMPTY'\n")
+            f.write("op[2].A = 'EMPTY'\n")
+            f.write("op[2].save_name = '(mtl)_Normal'\n")
+except (OSError, PermissionError) as e:
+    print(f"Failed to create or write to the file: {e}")
+initial_file = os.path.join(preset_folder, "PBR.py")
+try:
+    if not os.path.isfile(initial_file):
+        with open(initial_file, "w") as f:
+            f.write("import bpy\n")
+            f.write("scene = bpy.context.scene\n")
+            f.write("op = bpy.context.scene.other_props.exportprops\n")
+
+            f.write("scene.other_props.height_to_normal = True\n")
+            f.write("scene.other_props.invert_green_n = False\n")
+            f.write("op[0].type = 'RGB'\n")
+            f.write("op[0].RGB = 'DIFFUSE'\n")
+            f.write("op[0].R = 'METALLIC'\n")
+            f.write("op[0].G = 'ROUGHNESS'\n")
+            f.write("op[0].B = 'HEIGHT'\n")
+            f.write("op[0].A = 'DIFFUSE'\n")
+            f.write("op[0].save_name = '(mtl)_Diffuse'\n")
+            f.write("op[1].type = 'R'\n")
+            f.write("op[1].RGB = 'ROUGHNESS'\n")
+            f.write("op[1].R = 'METALLIC'\n")
+            f.write("op[1].G = 'ROUGHNESS'\n")
+            f.write("op[1].B = 'EMPTY'\n")
+            f.write("op[1].A = 'EMPTY'\n")
+            f.write("op[1].save_name = '(mtl)_Roughness'\n")
+            f.write("op[2].type = 'R'\n")
+            f.write("op[2].RGB = 'METALLIC'\n")
+            f.write("op[2].R = 'EMPTY'\n")
+            f.write("op[2].G = 'EMPTY'\n")
+            f.write("op[2].B = 'EMPTY'\n")
+            f.write("op[2].A = 'EMPTY'\n")
+            f.write("op[2].save_name = '(mtl)_Metallic'\n")
+            f.write("op[3].type = 'RGB'\n")
+            f.write("op[3].RGB = 'NORMAL'\n")
+            f.write("op[3].R = 'EMPTY'\n")
+            f.write("op[3].G = 'EMPTY'\n")
+            f.write("op[3].B = 'EMPTY'\n")
+            f.write("op[3].A = 'EMPTY'\n")
+            f.write("op[3].save_name = '(mtl)_Normal'\n")
+except (OSError, PermissionError) as e:
+    print(f"Failed to create or write to the file: {e}")
+initial_file = os.path.join(preset_folder, "ColorOnly.py")
+try:
+    if not os.path.isfile(initial_file):
+        with open(initial_file, "w") as f:
+            f.write("import bpy\n")
+            f.write("scene = bpy.context.scene\n")
+            f.write("op = bpy.context.scene.other_props.exportprops\n")
+
+            f.write("scene.other_props.height_to_normal = True\n")
+            f.write("scene.other_props.invert_green_n = False\n")
+            f.write("op[0].type = 'RGB'\n")
+            f.write("op[0].RGB = 'DIFFUSE'\n")
+            f.write("op[0].R = 'EMPTY'\n")
+            f.write("op[0].G = 'EMPTY'\n")
+            f.write("op[0].B = 'EMPTY'\n")
+            f.write("op[0].A = 'EMPTY'\n")
+            f.write("op[0].save_name = '(mtl)_Color'\n")
+except (OSError, PermissionError) as e:
+    print(f"Failed to create or write to the file: {e}")
 class OT_AddMyPreset(AddPresetBase, Operator):
     bl_idname = 'haspaint.add_preset'
     bl_label = 'Add A preset'
@@ -1455,7 +1539,7 @@ class OT_AddMyPreset(AddPresetBase, Operator):
         'scene.other_props.invert_green_n',
     ]
 
-    preset_subdir = 'haspresets/savepres'
+    preset_subdir = 'haspresets/savedpresets'
 
     def execute(self, context):
         self.preset_values = [
@@ -1474,11 +1558,11 @@ class OT_AddMyPreset(AddPresetBase, Operator):
                 f'op[{idx}].save_name',
             ])
         return super().execute(context)
-
+        
 class _MT_HASPresets(Menu):
     bl_idname = '_MT_HASPresets'
     bl_label = 'My Presets'
-    preset_subdir = 'haspresets/savepres'
+    preset_subdir = 'haspresets/savedpresets'
     preset_operator = 'haspaint.execute_preset_has'
     draw = Menu.draw_preset
 
@@ -1784,7 +1868,11 @@ class ExportTextures(Operator):
     )
 
     def execute(self, context):
-
+        part = get_material_collection()
+        if not part:
+            return {'FINISHED'}
+        elif not part.layers:
+            return {'FINISHED'}
         directory = os.path.dirname(self.filepath)
         user_filename = os.path.basename(self.filepath)
         otps = context.scene.other_props
@@ -1793,7 +1881,7 @@ class ExportTextures(Operator):
 
         basescene = bpy.context.window.scene
         usedtypes = getusedtypes()
-        part = get_material_collection()
+
         layers = get_layers(part.base_layers)
 
         mtlname = getmaterialgroupname(part)
@@ -1807,6 +1895,13 @@ class ExportTextures(Operator):
             node_group = bpy.data.node_groups[mtlname]
         has_mtl = tree.nodes.new('ShaderNodeGroup')
         has_mtl.node_tree = node_group
+        props = otps.exportprops
+        if not otps.exportprops:
+
+            pr = otps.exportprops.add()
+            pr.type = 'RGB'
+            pr.RGB = 'DIFFUSE'
+            pr.save_name = '(mtl)_Color'
         if otps.exportprops:
             for textype in otps.exportprops:
                 clear_socket_links(colorfix, 0)
@@ -1895,49 +1990,11 @@ class ExportTextures(Operator):
                 bake_image.save()
 
                 bpy.data.images.remove(bake_image)
-                #if albake_image:
-                #    bpy.data.images.remove(albake_image)
-        # else:
-        #     for type in usedtypes:
-        #         if otps.height_to_normal:
-        #             if type == "HEIGHT":
-        #                 type = 'NORMAL'
-        #         if type == 'NORMAL':
-        #             subt = create_node(tree,'ShaderNodeMixRGB', -600,0, "mix", "SUBTRACT")
-        #             set_default(subt, 0, 1.0)
-        #             nrmnd = create_node(tree,'ShaderNodeNormalMap', -600,0, "", "")
-        #             nrmlznd = create_node(tree,'ShaderNodeVectorMath', -600,0, "op", "NORMALIZE")
-        #             set_default(nrmnd, "Color", (0.0,0.0,0.0,0.0))
-        #             tree.links.new(colorfix.outputs[0], subt.inputs[1])
-        #             tree.links.new(nrmnd.outputs[0], subt.inputs[2])
-        #             tree.links.new(subt.outputs[0], nrmlznd.inputs[0])
-        #             emis = get_node_by_name(tree,"Emission")
-        #             if emis:
-        #                 tree.links.new(nrmlznd.outputs[0], emis.inputs[0])
-        #         type_name = gettexturelabel(type)
-        #         image_name = type_name
-        #         if otps.exportprops:
-        #             for textype in otps.exportprops:
-        #                 if textype.texture_type == type:
-        #                     image_name = generate_filename(textype.save_name, context, obj_name, mtlname, file_name, set_name)
-        #         else:
-        #             image_name=type_name
+                if albake_image:
+                    bpy.data.images.remove(albake_image)
 
-        #         bake_image = bpy.data.images.new(image_name, part.texture_sizeX, part.texture_sizeY, alpha=True)
-            
-        #         tree.links.new(has_mtl.outputs[f'{type_name}'], colorfix.inputs[1])
-        #         tree.links.new(has_mtl.outputs[f'{type_name}Alpha'], colorfix.inputs[2])
-        #         tree.links.new(has_mtl.outputs[f'{type_name}Alpha'], alphasocket)
+        cleanup_bake_scene( bake_scene, material, plane)
 
-        #         render_image(bake_scene, bake_image)
-
-        #         file_path = os.path.join(directory, bake_image.name + ".png")
-        #         bake_image.filepath_raw = os.path.join(directory, basescene.other_props.currentprefix + bake_image.name + ".png")
-                
-        #         bake_image.save()
-
-        #         bpy.data.images.remove(bake_image)
-        
         bpy.context.window.scene = basescene
 
         for area in context.screen.areas:
@@ -2325,7 +2382,6 @@ def render_image(scene, bake_image, filter = "", filter_value = 0.0, alpha_bake 
 
     render_layers = tree.nodes.new('CompositorNodeRLayers')
     render_layers.location = (-300, 0)
-    print(alpha_bake)
     if alpha_bake:
         alphaimage = tree.nodes.new('CompositorNodeImage')
         alphaimage.location = (0, 0)
@@ -3441,7 +3497,6 @@ class AddLayerToFolderOperator(Operator):
             for i, l in enumerate(reversed(subls)):
                 if curlayer==l:
                     reassign_layer(folderlayer.sub_layers, part.base_layers, curlayer.id)
-                    print(folditem.index)
                     part.base_layers.move(len(part.base_layers)-1,folditem.index)
                     break
 
@@ -5625,7 +5680,7 @@ def mask_gen_node(filter, layer, part):
     levels_node = levels(node_group, image_node.outputs[0], filter.levels, id =filter.id)
     filter.node_name = levels_node.name
     filter.resource.levels.levels_node.set_node_reference(levels_node)
-    filter.resource.mapping_node.set_node_reference(mappingnode)
+    #filter.resource.mapping_node.set_node_reference(mappingnode)
 
     blendalpha = create_node(node_group,'ShaderNodeMath', -200,0, "op", 'SUBTRACT')
     prevao = None
@@ -6030,7 +6085,7 @@ def layer_filter(layer, multi = False):
                 elif filter.name == "LIGHT":
                     nqdd = light_node(filter)
                     Op = nqdd.name
-
+                    
                     filter.displnode.set_node_reference(get_node_by_name(nqdd, "fs_LightNormal"))
                     optype = 'cus'
                     alphafiller= True
@@ -6360,9 +6415,9 @@ def clear_node_socket_connections(node):
 def clear_nodes(node_group,filters):
     for node in node_group.nodes:
         safe = False
-        if node.type == 'GROUP' and node.node_tree:
-            node_group.nodes.remove(node)
-            continue
+        # if node.type == 'GROUP' and node.node_tree:
+        #     node_group.nodes.remove(node)
+        #     continue
         for filter in filters:
             if filter.node_name == node.name:
                 safe = True
@@ -9336,14 +9391,11 @@ def register():
     bpy.types.Scene.debugplane_props = PointerProperty(type=DebugPlaneProps)
 
     presets_folder = bpy.utils.user_resource('SCRIPTS', create=True)
-    # Define paths
-    addon_folder = os.path.dirname(__file__)
-    has_presets = os.path.join(addon_folder, 'haspresets', 'savepres')
 
-    # Register property in Blender's scene type
+    has_presets = bpy.utils.user_resource('SCRIPTS', path= "presets/haspresets/savedpresets", create=False)
+    
     bpy.types.Scene.has_presets = StringProperty(name="My Presets", default=has_presets)
 
-    # Ensure the directory exists
     if not os.path.isdir(has_presets):
         os.makedirs(has_presets)
 
