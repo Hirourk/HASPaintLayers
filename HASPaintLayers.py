@@ -1904,6 +1904,8 @@ class ExportTextures(Operator):
             pr.save_name = '(mtl)_Color'
         if otps.exportprops:
             for textype in otps.exportprops:
+                if textype.A:
+                    alpha_name = gettexturelabel(textype.A)
                 clear_socket_links(colorfix, 0)
                 clear_socket_links(colorfix, 1)
                 clear_socket_links(colorfix, 2)
@@ -1936,17 +1938,19 @@ class ExportTextures(Operator):
                     tree.links.new(has_mtl.outputs[f'{type_name}'], colorfix.inputs[1])
                     tree.links.new(has_mtl.outputs[f'{type_name}Alpha'], colorfix.inputs[2])
                     #tree.links.new(has_mtl.outputs[f'{type_name}Alpha'], alphasocket)
+                    
                     alphafrom = has_mtl.outputs[f'{type_name}Alpha']
                     alphabake = True
                 elif textype.type == "RGB_A":
                     type_name = gettexturelabel(textype.RGB)
-                    alpha_name = gettexturelabel(textype.A)
+                    #alpha_name = gettexturelabel(textype.A)
 
                     tree.links.new(has_mtl.outputs[f'{type_name}'], colorfix.inputs[1])
                     set_default(colorfix, 2, (1.0,1.0,1.0,1.0))
                     #tree.links.new(has_mtl.outputs[f'{alpha_name}'], alphasocket)
-                    alphafrom = has_mtl.outputs[f'{alpha_name}']
-                    alphabake = True
+                    if alpha_name in has_mtl.outputs:
+                        alphafrom = has_mtl.outputs[f'{alpha_name}']
+                        alphabake = True
                 elif textype.type == "R_G_B_A":
                     R = gettexturelabel(textype.R)
                     G = gettexturelabel(textype.G)
@@ -1960,9 +1964,11 @@ class ExportTextures(Operator):
                     #tree.links.new(has_mtl.outputs[f'{A}'], alphasocket)
 
                     tree.links.new(Combine.outputs[0], colorfix.inputs[1])
-                    alphafrom = has_mtl.outputs[f'{A}']
+                    if alpha_name in has_mtl.outputs:
+                        alphafrom = has_mtl.outputs[f'{A}']
+                        alphabake = True
                     set_default(colorfix, 2, (1.0,1.0,1.0,1.0))
-                    alphabake = True
+
                 elif textype.type == "R":
                     R = gettexturelabel(textype.R)
                     bw = create_node(material.node_tree,'ShaderNodeRGBToBW', 50,300, "", "")
