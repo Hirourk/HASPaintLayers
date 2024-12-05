@@ -1526,7 +1526,7 @@ except (OSError, PermissionError) as e:
 class OT_AddMyPreset(AddPresetBase, Operator):
     bl_idname = 'haspaint.add_preset'
     bl_label = 'Add A preset'
-    preset_menu = '_MT_HASPresets'
+    preset_menu = 'PR_MT_HASPresets'
     bl_options = {'REGISTER', 'UNDO'}
 
     preset_defines = [
@@ -1559,8 +1559,8 @@ class OT_AddMyPreset(AddPresetBase, Operator):
             ])
         return super().execute(context)
         
-class _MT_HASPresets(Menu):
-    bl_idname = '_MT_HASPresets'
+class PR_MT_HASPresets(Menu):
+    bl_idname = 'PR_MT_HASPresets'
     bl_label = 'My Presets'
     preset_subdir = 'haspresets/savedpresets'
     preset_operator = 'haspaint.execute_preset_has'
@@ -1585,7 +1585,7 @@ class ExecutePreset(Operator):
         from os.path import basename, splitext
         filepath = self.filepath
 
-        preset_class = getattr(bpy.types, '_MT_HASPresets')
+        preset_class = getattr(bpy.types, 'PR_MT_HASPresets')
         preset_class.bl_label = bpy.path.display_name(basename(filepath))
 
         ext = splitext(filepath)[1].lower()
@@ -1660,7 +1660,7 @@ class TEXTURE_PT_file_browser_panel(bpy.types.Panel):
         box = layout.box()
 
         row = box.row(align=True)
-        row.menu("_MT_HASPresets", text="Template Presets", icon='COLLAPSEMENU')
+        row.menu("PR_MT_HASPresets", text="Template Presets", icon='COLLAPSEMENU')
         row.operator("haspaint.add_preset", text="", icon='ADD')
         row.operator("haspaint.add_preset", text="", icon='REMOVE').remove_active = True
         
@@ -1694,7 +1694,7 @@ class TEXTURE_PT_file_browser_panel(bpy.types.Panel):
                     row.prop(item, "B", text="B")
                     row.prop(item, "A", text="A")
                 elif item.type == "R":
-                    row.prop(item, "RGB", text="R")
+                    row.prop(item, "R", text="R")
         box.operator("haspaint.add_texture_type_prop", text="Add Texture Type") 
 
 ###
@@ -1889,6 +1889,9 @@ class ExportTextures(Operator):
         file_name = os.path.basename(bpy.data.filepath) if bpy.data.filepath else "untitled"
         set_name = part.name
         bake_scene, material, plane, output_node, colorfix, alphasocket, camera = setup_bake_scene(basescene)
+        if part.uvs:
+            old_uv = plane.data.uv_layers[0]
+            new_uv = plane.data.uv_layers.new(name=part.uvs)
 
         tree = material.node_tree
         if mtlname in bpy.data.node_groups:
@@ -1918,19 +1921,31 @@ class ExportTextures(Operator):
                     type_name = gettexturelabel(textype.RGB)
 
                     tree.links.new(has_mtl.outputs[f'{type_name}'], colorfix.inputs[1])
+                    #has_mtl.inputs["Normal"].default_value = (0.0,0.0,0.0,0.0)
 
                     if type_name == 'Normal':
-                        subt = create_node(tree,'ShaderNodeMixRGB', -600,0, "mix", "SUBTRACT")
-                        set_default(subt, 0, 1.0)
-                        nrmnd = create_node(tree,'ShaderNodeNormalMap', -600,0, "", "")
-                        nrmlznd = create_node(tree,'ShaderNodeVectorMath', -600,0, "op", "NORMALIZE")
-                        set_default(nrmnd, "Color", (0.0,0.0,0.0,0.0))
-                        tree.links.new(colorfix.outputs[0], subt.inputs[1])
-                        tree.links.new(nrmnd.outputs[0], subt.inputs[2])
-                        tree.links.new(subt.outputs[0], nrmlznd.inputs[0])
-                        emis = get_node_by_name(tree,"Emission")
-                        if emis:
-                            tree.links.new(nrmlznd.outputs[0], emis.inputs[0])
+                        tree.links.new(has_mtl.outputs[f'RawNormal'], colorfix.inputs[1])
+                        #seprgb = create_node(tree,'ShaderNodeSeparateRGB', -600,0, "", "")
+                        #nrmlznd = create_node(tree,'ShaderNodeVectorMath', -600,0, "op", "NORMALIZE")
+                        if otps.height_to_normal:
+                            subt = create_node(tree,'ShaderNodeMixRGB', -600,0, "mix", "SUBTRACT")
+                            set_default(subt, 0, 1.0)
+                            bump = create_node(tree,'ShaderNodeBump', -600,0, "", "")
+                            set_default(bump, 0, part.height_intensity)
+                            nrmnd = create_node(tree,'ShaderNodeNormalMap', -600,0, "", "")
+
+                            scre = create_node(tree,'ShaderNodeMixRGB', -600,0, "mix", "SCREEN")
+                            set_default(scre, 0, 1.0)
+
+                            tree.links.new(has_mtl.outputs["Height"], bump.inputs[2])
+                            tree.links.new(bump.outputs[0], subt.inputs[1])
+                            tree.links.new(nrmnd.outputs[0], subt.inputs[2])
+                            tree.links.new(subt.outputs[0], scre.inputs[1])
+                            tree.links.new(has_mtl.outputs[f'RawNormal'], scre.inputs[2])
+
+                            emis = get_node_by_name(tree,"Emission")
+                            if emis:
+                                tree.links.new(scre.outputs[0], emis.inputs[0])
 
                 elif textype.type == "RGBA":
                     type_name = gettexturelabel(textype.RGBA)
@@ -1957,7 +1972,7 @@ class ExportTextures(Operator):
                     B = gettexturelabel(textype.B)
                     A = gettexturelabel(textype.A)
                     Combine = create_node(material.node_tree,'ShaderNodeCombineRGB', 50,300, "", "")
-
+                    
                     tree.links.new(has_mtl.outputs[f'{R}'], Combine.inputs[0])
                     tree.links.new(has_mtl.outputs[f'{G}'], Combine.inputs[1])
                     tree.links.new(has_mtl.outputs[f'{B}'], Combine.inputs[2])
@@ -1970,6 +1985,7 @@ class ExportTextures(Operator):
                     set_default(colorfix, 2, (1.0,1.0,1.0,1.0))
 
                 elif textype.type == "R":
+                    
                     R = gettexturelabel(textype.R)
                     bw = create_node(material.node_tree,'ShaderNodeRGBToBW', 50,300, "", "")
                     
@@ -1981,7 +1997,7 @@ class ExportTextures(Operator):
                     alphabake = True
                 image_name = generate_filename(textype.save_name, context, obj_name, mtlname, file_name, set_name)
                 albake_image = None
-                if alphabake:
+                if alphabake and alphafrom:
                     saved_links = get_links(colorfix, 1)
                     tree.links.new(alphafrom, colorfix.inputs[1])
                     albake_image = bpy.data.images.new(f"{image_name}_alpha", part.texture_sizeX, part.texture_sizeY, alpha=True)
@@ -1999,7 +2015,7 @@ class ExportTextures(Operator):
                 if albake_image:
                     bpy.data.images.remove(albake_image)
 
-        cleanup_bake_scene( bake_scene, material, plane)
+        #cleanup_bake_scene( bake_scene, material, plane)
 
         bpy.context.window.scene = basescene
 
@@ -6838,7 +6854,7 @@ def hasmatnode():
         elif layer.layer_type =="PBR":
             create_pbr_nodegroup(layer)
 
-    for indexgr, tex_type in enumerate(getusedmaps()):
+    for indexgr, tex_type in enumerate(TEXTURE_TYPE):
 
         lgroup = layersgroup(tex_type, name)
         
@@ -6860,12 +6876,17 @@ def hasmatnode():
             hsocketout = group_node.outputs['Color']
             set_default(node_group, "Height", (0.5,0.5,0.5,1.0))
         if type == "NORMAL":
+            nrmsocketout = group_node.outputs['Color']
             set_default(node_group, "Normal", (0.5,0.5,1.0,1.0))
         if type == "DIFFUSE":
             set_default(node_group, "Diffuse", (0.0,0.0,0.0,1.0))
         if not type == "DIFFUSE":
             set_default(node_group, anm, 1.0)
 
+    create_socket(node_group, "RawNormal", 'Color', False)
+    if nrmsocketout:
+        links.new(nrmsocketout, output_node.inputs["RawNormal"])
+    
     for type in getusedmaps():
         nm = type[1]
         anm = f'{nm}Alpha'
@@ -9317,7 +9338,7 @@ classes = [
     DeleteLayersOperator,
     UpdateHist,
     OT_AddMyPreset,
-    _MT_HASPresets,
+    PR_MT_HASPresets,
     AddTextureTypeProp,
     RemoveTextureTypeProp,
     ExecutePreset,
