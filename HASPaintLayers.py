@@ -6521,7 +6521,7 @@ def create_socket(node_group, name, socket_type_key, input):
             node_group.outputs.new(socket_type, name)
 
 def set_default(node_group, name, value):
-    if hasattr(node_group, 'interface'):
+    if hasattr(node_group, 'interface') and hasattr(node_group.interface, 'items_tree'):
         for ind, item in enumerate(node_group.interface.items_tree):
             if item.item_type == 'SOCKET':
                 if item.in_out == 'INPUT':
