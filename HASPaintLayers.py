@@ -21,7 +21,7 @@ bl_info = {
     "name": "HAS Paint Layers",
     "blender": (3, 1, 0),
     "category": "Paint",
-    "version": (0, 8, 2),
+    "version": (0, 8, 4),
     "description": "Layers for texture painting",
     "author": "Hirourk",
     "location": "View3D > Tool Shelf > Paint Layers",
@@ -758,10 +758,7 @@ class LayerProperties(PropertyGroup):
     def texturetypechanged(self, context):
         if self.suppress_update:
             return
-        if self.texture_type == "NORMAL":
-            suppress_update = True
-            self.blend_mode = "COMBNRM"
-            suppress_update = False
+
         if self.texture_type == "HEIGHT":
             suppress_update = True
             self.blend_mode = "ADD"
@@ -802,7 +799,8 @@ class LayerProperties(PropertyGroup):
         max=1.0,
         update=update_opacity
     )
-    mask_value: PointerProperty(type=SocketReference)
+    #mask_value: PointerProperty(type=SocketReference)
+    mask_value: BoolProperty(default = False, name = "MaskBase", update=update_layer)
     opacity_socket: PointerProperty(type=SocketReference)
 
     use_layer: BoolProperty(
@@ -935,12 +933,7 @@ class OtherProps(PropertyGroup):
         name="Image",
         type=bpy.types.Image
     )
-    texture_filtering: EnumProperty(
-        name="Texture filtering",
-        items= TEXTURE_FILTER,
-        default='Cubic',
-        update=update_layer
-    )
+
     expand_area_MtlSettings: BoolProperty(
         name="Expand Material Settings",
     )
@@ -1393,8 +1386,15 @@ class HASMaterialProperties(PropertyGroup):
     addtofolder: StringProperty()
     selected_layer: StringProperty()
     selected_alpha: BoolProperty()
+    InvertG: BoolProperty(default = False, update=update_layer)
     move_layer: IntProperty()
     node: StringProperty()
+    texture_filtering: EnumProperty(
+        name="Texture filtering",
+        items= TEXTURE_FILTER,
+        default='Cubic',
+        update=update_layer
+    )
 
 class ViewData(PropertyGroup):
     image_name: StringProperty()
@@ -1924,7 +1924,15 @@ class ExportTextures(Operator):
                     #has_mtl.inputs["Normal"].default_value = (0.0,0.0,0.0,0.0)
 
                     if type_name == 'Normal':
-                        tree.links.new(has_mtl.outputs[f'RawNormal'], colorfix.inputs[1])
+                        invnrmnode = create_node(tree,'ShaderNodeGroup', -200,-200, "cus", InvertNormalNode().name) if otps.invert_green_n else None
+
+                        gamma = create_node(tree,'ShaderNodeGamma', -200,0, "", '')
+                        set_default(gamma,1, 2.4)
+                        tree.links.new(has_mtl.outputs[f'RawNormal'], gamma.inputs[0])
+                        tree.links.new(gamma.outputs[0], colorfix.inputs[1])
+                        if invnrmnode:
+                            tree.links.new(gamma.outputs[0], invnrmnode.inputs['Normal'])
+                            tree.links.new(invnrmnode.outputs['Normal'], colorfix.inputs[1])
                         #seprgb = create_node(tree,'ShaderNodeSeparateRGB', -600,0, "", "")
                         #nrmlznd = create_node(tree,'ShaderNodeVectorMath', -600,0, "op", "NORMALIZE")
                         if otps.height_to_normal:
@@ -1941,8 +1949,12 @@ class ExportTextures(Operator):
                             tree.links.new(bump.outputs[0], subt.inputs[1])
                             tree.links.new(nrmnd.outputs[0], subt.inputs[2])
                             tree.links.new(subt.outputs[0], scre.inputs[1])
-                            tree.links.new(has_mtl.outputs[f'RawNormal'], scre.inputs[2])
-
+                            #tree.links.new(has_mtl.outputs[f'RawNormal'], scre.inputs[2])
+                            tree.links.new(has_mtl.outputs[f'RawNormal'], gamma.inputs[0])
+                            tree.links.new(gamma.outputs[0], scre.inputs[2])
+                            if invnrmnode:
+                                tree.links.new(gamma.outputs[0], invnrmnode.inputs['Normal'])
+                                tree.links.new(invnrmnode.outputs['Normal'], scre.inputs[2])
                             emis = get_node_by_name(tree,"Emission")
                             if emis:
                                 tree.links.new(scre.outputs[0], emis.inputs[0])
@@ -2015,7 +2027,7 @@ class ExportTextures(Operator):
                 if albake_image:
                     bpy.data.images.remove(albake_image)
 
-        #cleanup_bake_scene( bake_scene, material, plane)
+        cleanup_bake_scene( bake_scene, material, plane)
 
         bpy.context.window.scene = basescene
 
@@ -2288,7 +2300,7 @@ def bake_layer(context, layer, basescene, bake_image):
         tree.links.new(group_node.outputs['Alpha'], alphasocket)
 
         render_image(bake_scene, bake_image)
-
+        cleanup_bake_scene( bake_scene, material, plane)
         bpy.context.window.scene = basescene
 
         return True, bake_image
@@ -2303,8 +2315,8 @@ def setup_bake_scene(basescene):
     bpy.context.window.scene = new_scene
     material = bpy.data.materials.new(name="HASBakeMtlTemp")
 
-    new_scene.render.resolution_x = part.texture_sizeX
-    new_scene.render.resolution_y = part.texture_sizeY
+    new_scene.render.resolution_y = part.texture_sizeX
+    new_scene.render.resolution_x = part.texture_sizeY
 
     if material.use_nodes is False:
         material.use_nodes = True
@@ -2365,8 +2377,8 @@ def setup_bake_scene(basescene):
     plane.name = "BakePlane"
     plane.data.materials.append(material)
 
-    plane.scale.x = part.texture_sizeX / max(part.texture_sizeX, part.texture_sizeY)
-    plane.scale.y = part.texture_sizeY / max(part.texture_sizeX, part.texture_sizeY)
+    plane.scale.y = part.texture_sizeX / max(part.texture_sizeX, part.texture_sizeY)
+    plane.scale.x = part.texture_sizeY / max(part.texture_sizeX, part.texture_sizeY)
 
     return new_scene, material, plane, output_node, MixRGB, MixShader.inputs[0], camera
 
@@ -2494,7 +2506,7 @@ class ResizeTexturePopup(Operator):
         bake_scene.render.resolution_y = self.new_height
         tree = material.node_tree
         image_node = create_node(tree,'ShaderNodeTexImage', -600,0, "img", layer.resource.image)
-        image_node.interpolation= bpy.context.scene.other_props.texture_filtering
+        image_node.interpolation= part.texture_filtering
         tree.links.new(image_node.outputs[0], colorfix.inputs[1])
         tree.links.new(image_node.outputs[1], colorfix.inputs[2])
         tree.links.new(image_node.outputs[1], alphasocket)
@@ -2536,7 +2548,7 @@ class ResizeAllLayersPopup(Operator):
         for layer in part.layers:
 
             image_node = create_node(tree,'ShaderNodeTexImage', -600,0, "img", layer.resource.image)
-            image_node.interpolation= bpy.context.scene.other_props.texture_filtering
+            image_node.interpolation= part.texture_filtering
             tree.links.new(image_node.outputs[0], colorfix.inputs[1])
             tree.links.new(image_node.outputs[1], colorfix.inputs[2])
             tree.links.new(image_node.outputs[1], alphasocket)
@@ -4446,7 +4458,7 @@ class HAS_PT_LayersPanel(bpy.types.Panel):
                     row1.prop(part, "shader_type", text="")
                     row1 = rowd.row()
                     row1.label(text= "Texture filtering")
-                    row1.prop(context.scene.other_props, "texture_filtering", text="")
+                    row1.prop(part, "texture_filtering", text="")
                     row1 = rowd.row()
                     row1.label(text= "UV Channel")
                     row1.prop(part, "uvs", text="")
@@ -4459,7 +4471,9 @@ class HAS_PT_LayersPanel(bpy.types.Panel):
                     row1 = rowd.row()
                     row1.label(text= "Alpha")
                     row1.prop(part, "diffusealpha", text="Use Diffuse Alpha", toggle = True)
-
+                    row1 = rowd.row()
+                    row1.label(text= "Invert G in Normal")
+                    row1.prop(part, "InvertG", text="")
                     row = box.row(align=False)
                     row.label(text="Texture size")
                     txl = row.operator("haspaint.texture_size_add_subtract", text="", icon='ADD')
@@ -4796,8 +4810,9 @@ def layerbox(self, context, layout, layers, masks, index, parent):
             select_op.id = layer.id
             select_op.alpha= "Set"
             if selectedalpha:
-                if layer.mask_value.get_socket():
-                    rowfe.prop(layer.mask_value, "default_value", text="", slider = True)
+                #if layer.mask_value.get_socket():
+                #    rowfe.prop(layer.mask_value, "default_value", text="", slider = True)
+                rowfe.prop(layer, "mask_value", text="White Mask" if layer.mask_value else "Black Mask", icon = 'SNAP_FACE'  if layer.mask_value else 'COLORSET_16_VEC')
                 addpaint = rowfe.operator("haspaint.add_layer_filter", text="Add Paint", icon='BRUSH_DATA')
                 addpaint.layer_index = layer.index
                 addpaint.type = "PAINT"
@@ -4828,8 +4843,9 @@ def layerbox(self, context, layout, layers, masks, index, parent):
                 select_op.id = layer.id
                 select_op.alpha= "Set"
                 if selectedalpha:
-                    if layer.mask_value.get_socket():
-                        rowfe.prop(layer.mask_value, "default_value", text="", slider = True)
+                    #if layer.mask_value.get_socket():
+                    #    rowfe.prop(layer.mask_value, "default_value", text="", slider = True)
+                    rowfe.prop(layer, "mask_value", text="White Mask" if layer.mask_value else "Black Mask", icon = 'SNAP_FACE'  if layer.mask_value else 'COLORSET_16_VEC')
                     addpaint = rowfe.operator("haspaint.add_layer_filter", text="Add Paint", icon='BRUSH_DATA')
                     addpaint.layer_index = layer.index
                     addpaint.type = "PAINT"
@@ -5799,16 +5815,22 @@ def create_layer_node(layer, pbr = False):
 
     if img:
         image_node = create_image_node(node_group, img, resource = layer.resource)
+        lastconnection = image_node.outputs[0]
+        if layer.texture_type == "NORMAL" and layer.resource.image.colorspace_settings.name == "sRGB":
+            gamma = create_node(node_group,'ShaderNodeGamma', -200,0, "", '')
+            set_default(gamma,1, 0.454)
+            lastconnection = gamma.outputs[0]
+            links.new(image_node.outputs[0], gamma.inputs[0])
     math_node = create_node(node_group,'ShaderNodeMath', -200,0, "op", 'MULTIPLY')
     
     if layer.mask:
         initialmask = create_node(node_group,'ShaderNodeMath', -200,0, "op", 'MULTIPLY')
         initialmask.name = "InitialMask"
-        initialmask.inputs[1].name = "MaskValue"
-        set_default(initialmask, 1, layer.mask_value.default_value)
-        layer.mask_value.set_socket_reference(initialmask.inputs[1])
-    else:
-        layer.mask_value.set_socket_reference(math_node.inputs[0])
+        initialmask.inputs[0].name = "MaskValue"
+        set_default(initialmask, 0, 1.0 if layer.mask_value else 0.0)
+        #layer.mask_value.set_socket_reference(initialmask.inputs[1])
+    #else:
+        #layer.mask_value.set_socket_reference(math_node.inputs[0])
 
     set_default(math_node, 0, 1.0)    
     set_default(math_node, 1, layer.opacity)
@@ -5824,14 +5846,14 @@ def create_layer_node(layer, pbr = False):
             mix_node= create_node(node_group,'ShaderNodeMixRGB', 0,0, "mix", "MIX")
 
         mix_node.use_clamp = True
-
+    
     mix_node.inputs[2].name = "ColSock"
     layer.resource.default_color_socket.set_socket_reference(mix_node.inputs["ColSock"])
     height_remap = None
 
-    if img:
-        lastconnection = image_node.outputs[1]
-        lastclipmaskconnection = image_node.outputs[0]
+    # if img:
+    #     lastconnection = image_node.outputs[1]
+    #     lastclipmaskconnection = image_node.outputs[0]
 
     if not img:
         set_default(mix_node, 'ColSock', layer.resource.default_color)
@@ -5851,8 +5873,12 @@ def create_layer_node(layer, pbr = False):
                 links.new(image_node.outputs[0], height_remap.inputs[0])
                 lastconnection = height_remap.outputs[0]
             else:
-                lastconnection = image_node.outputs[0]
+                if not lastconnection:
+                    lastconnection = image_node.outputs[0]
             lastclipmaskconnection = image_node.outputs[1]
+    if layer.mask:
+        links.new(lastclipmaskconnection, initialmask.inputs[1])
+        lastclipmaskconnection = initialmask.outputs[0]
     if active_filters:
         filnode = create_node(node_group,'ShaderNodeGroup', -200,-200, "cus", layer_filter(layer).name)
         set_default(filnode, 'Color', layer.resource.default_color)
@@ -5873,11 +5899,8 @@ def create_layer_node(layer, pbr = False):
     if lastconnection:
         links.new(lastconnection, mix_node.inputs[2])
     if lastclipmaskconnection:
-        if layer.mask:
-            links.new(lastclipmaskconnection, initialmask.inputs[0])
-            links.new(initialmask.outputs[0], math_node.inputs[0])
-        else:
-            links.new(lastclipmaskconnection, math_node.inputs[0])
+
+        links.new(lastclipmaskconnection, math_node.inputs[0])
 
     alphablend= create_node(node_group,'ShaderNodeMixRGB', 0,0, "mix", "SCREEN")
     set_default(alphablend,0,1.0)
@@ -6734,6 +6757,8 @@ def UpdateShader():
                 if bpy.context.scene.other_props.preview_mode == type[0]:
                     material.blend_method = "OPAQUE"
                     tree_links.new(group_node.outputs[type[1]], output_node.inputs[0])
+                if bpy.context.scene.other_props.preview_mode == "NORMAL":
+                    tree_links.new(group_node.outputs["RawNormal"], output_node.inputs[0])
                     
     elif part.shader_type == 'UNLIT':
         tree_links.new(group_node.outputs['Diffuse'], shader_node.inputs["Color"])
@@ -6821,12 +6846,19 @@ def layersgroup(tex_type, name):
                     links.new(group_input.outputs['Alpha'], layer_node.inputs['Alpha'])
                 prev_node = layer_node
 
-    if prev_node:    
+    if prev_node:
         links.new(prev_node.outputs['Color'], group_output.inputs['Color'])
         links.new(prev_node.outputs['Alpha'], group_output.inputs['Alpha'])
+        if part.InvertG:
+            if tex_type[0] == "NORMAL":
+                invnrmnode = create_node(node_group,'ShaderNodeGroup', -200,count*-200, "cus", InvertNormalNode().name)
+                if invnrmnode:
+                    links.new(prev_node.outputs['Color'], invnrmnode.inputs['Normal'])
+                    links.new(invnrmnode.outputs['Normal'], group_output.inputs['Color'])
     else:
         links.new(group_input.outputs['Color'], group_output.inputs['Color'])
-        links.new(group_input.outputs['Alpha'], group_output.inputs['Alpha']) 
+        links.new(group_input.outputs['Alpha'], group_output.inputs['Alpha'])
+
     return node_group
 
 def hasmatnode():
@@ -6992,6 +7024,43 @@ def levels(node_group, colsoc, levelref, id = ""):
         levelref.levels_node.set_node_reference(curve)
         return curve
     return None
+
+def InvertNormalNode():
+    part = get_material_collection()
+    name = ".HAS_InvertNormal"
+    if name in bpy.data.node_groups:
+        node_group = bpy.data.node_groups[name]
+        clear_nodes_ignoring(node_group)
+    else:
+        node_group = bpy.data.node_groups.new(type="ShaderNodeTree", name=name)
+
+    create_socket(node_group, "Normal", 'color', True)
+    create_socket(node_group, "Normal", 'color', False)
+
+    input_node = node_group.nodes.new(type='NodeGroupInput')
+    input_node.location = (-500, 0)
+    output_node = node_group.nodes.new(type='NodeGroupOutput')
+    output_node.location = (500, 0)
+
+    Note(node_group)
+
+    sep = create_node(node_group,'ShaderNodeSeparateRGB', 50,300, "", "")
+    com = create_node(node_group,'ShaderNodeCombineRGB', 50,300, "", "")
+    inv = create_node(node_group,'ShaderNodeInvert', 50,300, "", "")
+    add = create_node(node_group,'ShaderNodeMath', 50,300, "op", "ADD")
+    tree_links = node_group.links
+
+    tree_links.new(input_node.outputs[0], sep.inputs[0])
+
+    tree_links.new(sep.outputs[0], com.inputs[0])
+    tree_links.new(sep.outputs[1], add.inputs[0])
+    tree_links.new(add.outputs[0], inv.inputs[1])
+    tree_links.new(inv.outputs[0], com.inputs[1])
+    tree_links.new(sep.outputs[2], com.inputs[2])
+
+    tree_links.new(com.outputs[0], output_node.inputs[0])
+
+    return node_group
 
 def set_rgb_curve(node, val1, val2, val3, val4, val5, index):
     if not node:
@@ -8102,10 +8171,10 @@ def create_image_node(node_group, img, resource = None):
     links = node_group.links
     image_node = create_node(node_group,'ShaderNodeTexImage', -600,0, "img", img)
     
-    image_node.interpolation= bpy.context.scene.other_props.texture_filtering
+    image_node.interpolation= part.texture_filtering
 
-    attribute = create_node(node_group,'ShaderNodeAttribute', -600,0, "", "")
-    attribute.attribute_name = part.uvs
+    attribute = create_node(node_group,'ShaderNodeUVMap', -600,0, "", "")
+    attribute.uv_map = part.uvs
 
     mapping = create_node(node_group,'ShaderNodeMapping', -600,0, "", "")
     if resource:
@@ -8113,12 +8182,12 @@ def create_image_node(node_group, img, resource = None):
         set_default(mapping, "Rotation", (0.0,0.0,resource.maprot))
         set_default(mapping, "Scale", (resource.mapscalex,resource.mapscaley,1.0))
         resource.mapping_node.set_node_reference(mapping)
-    links.new(attribute.outputs[1],mapping.inputs[0])
+    links.new(attribute.outputs[0],mapping.inputs[0])
     links.new(mapping.outputs[0],image_node.inputs[0])
     if part.uvs:
         attribute = create_node(node_group,'ShaderNodeAttribute', -600,0, "", "")
         attribute.attribute_name = part.uvs
-        links.new(attribute.outputs[0],image_node.inputs[0])
+        links.new(attribute.outputs[1],mapping.inputs[0])
     return image_node
 
 ###
