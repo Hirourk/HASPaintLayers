@@ -21,7 +21,7 @@ bl_info = {
     "name": "HAS Paint Layers",
     "blender": (3, 1, 0),
     "category": "Paint",
-    "version": (0, 8, 4),
+    "version": (0, 8, 5),
     "description": "Layers for texture painting",
     "author": "Hirourk",
     "location": "View3D > Tool Shelf > Paint Layers",
@@ -567,25 +567,17 @@ class MaskGeneratorProperty(PropertyGroup):
     objn_expand: BoolProperty(name="Object Normal",default = False)
 
 class FilterProperty(PropertyGroup):
-
-    def get_custom_shader_groups(self, context):
-        enum_items = []
-        enum_items.append(('NONE', 'None', ''))
-        for node_group in bpy.data.node_groups:
-            if node_group.type == 'SHADER':
-                group_name = node_group.name
-                enum_items.append((group_name, group_name, "Custom Shader Group Node"))
-        
-        if not enum_items:
-            enum_items.append(('NONE', 'None', 'No custom shader node groups found'))
-        
-        return enum_items
+    def resetinputs(self):
+        self.socket_in = 0
+        self.socket_out = 0
     def reset_filter_name(self, context):
         if self.suppress_update:
             return
         self.suppress_update = True
+        self.resetinputs()
         self.node_name = ""
         self.resource.image = None
+
         if self.name == "LIGHT":
             for geds in get_material_collection().bake_maps:
                 geds.type == "NRMOBJ"
@@ -605,9 +597,17 @@ class FilterProperty(PropertyGroup):
     def reset_filter(self, context):
         
         self.suppress_update = True
+        self.resetinputs()
         UpdateShader()
         self.suppress_update = False
-
+    def reset_custom_filter(self, context):
+        self.suppress_update = True
+        self.node_name = ""
+        self.resetinputs()
+        if self.custom_node_tree_p and self.custom_node_tree_p.name.startswith("."):
+            self.custom_node_tree_p = None
+        UpdateShader()
+        self.suppress_update = False
     def update_layer(self, context):
         if not self.suppress_update:
             layer_filter(get_layer_by_id(self.layer_in), multi = True)
@@ -644,12 +644,8 @@ class FilterProperty(PropertyGroup):
         description="Name of the node",
     )
     mixnode: StringProperty()
-    custom_node_tree: EnumProperty(
-        name="Custom Shader Group",
-        items=get_custom_shader_groups,
-        description="Choose a custom shader node group",
-        update=reset_filter,
-    )
+    #custom_node_tree: StringProperty(update = reset_filter_name)
+    custom_node_tree_p: PointerProperty(type=bpy.types.NodeTree, update = reset_custom_filter)
     layer_in: StringProperty(
         default="",
     )
@@ -662,8 +658,7 @@ class FilterProperty(PropertyGroup):
     )
     socket_out: IntProperty(
         default=0,
-        name="Input",
-        
+        name="Input", 
     )
 
     image: PointerProperty(
@@ -1082,6 +1077,7 @@ class OtherProps(PropertyGroup):
     emptyprop: BoolProperty()
     exportprops: CollectionProperty(type=TextureTypeProp)
     usedids: StringProperty()
+    search: StringProperty()
 
 class DebugPlaneProps(PropertyGroup):
     depth_distance: FloatProperty(
@@ -1395,7 +1391,7 @@ class HASMaterialProperties(PropertyGroup):
         default='Cubic',
         update=update_layer
     )
-
+    colorfix: BoolProperty(default = True, update = update_layer)
 class ViewData(PropertyGroup):
     image_name: StringProperty()
     image_path: StringProperty()
@@ -1961,13 +1957,14 @@ class ExportTextures(Operator):
 
                 elif textype.type == "RGBA":
                     type_name = gettexturelabel(textype.RGBA)
-
+                    #mixs = get_node_by_name(tree,"Mix Shader")
                     tree.links.new(has_mtl.outputs[f'{type_name}'], colorfix.inputs[1])
                     tree.links.new(has_mtl.outputs[f'{type_name}Alpha'], colorfix.inputs[2])
+                    tree.links.new(has_mtl.outputs[f'{type_name}Alpha'], alphasocket)
                     #tree.links.new(has_mtl.outputs[f'{type_name}Alpha'], alphasocket)
                     
-                    alphafrom = has_mtl.outputs[f'{type_name}Alpha']
-                    alphabake = True
+                    #alphafrom = has_mtl.outputs[f'{type_name}Alpha']
+                    #alphabake = False
                 elif textype.type == "RGB_A":
                     type_name = gettexturelabel(textype.RGB)
                     #alpha_name = gettexturelabel(textype.A)
@@ -2015,7 +2012,7 @@ class ExportTextures(Operator):
                     albake_image = bpy.data.images.new(f"{image_name}_alpha", part.texture_sizeX, part.texture_sizeY, alpha=True)
                     render_image(bake_scene, albake_image)  
                     set_links(saved_links,colorfix.inputs[1])
-                clear_socket_links(alphasocket.node, 0)
+                    clear_socket_links(alphasocket.node, 0)
                 bake_image = bpy.data.images.new(image_name, part.texture_sizeX, part.texture_sizeY, alpha=True)
                 render_image(bake_scene, bake_image, alpha_bake = albake_image)    
                 file_path = os.path.join(directory, bake_image.name + ".png")
@@ -2027,7 +2024,7 @@ class ExportTextures(Operator):
                 if albake_image:
                     bpy.data.images.remove(albake_image)
 
-        cleanup_bake_scene( bake_scene, material, plane)
+        #cleanup_bake_scene( bake_scene, material, plane)
 
         bpy.context.window.scene = basescene
 
@@ -3586,7 +3583,7 @@ def copy_layer(layer, to_layer):
     "node_name",
     "layer_name",
     "in_use",
-    'custom_node_tree',
+    'custom_node_tree_p',
     'socket_in',
     'socket_out',
     'image',
@@ -4014,6 +4011,7 @@ class FilterSelectPopup(Operator):
     def invoke(self, context, event):
         wm = context.window_manager
         return wm.invoke_popup(self)
+
 
 class TypeSelectPopup(Operator):
     bl_idname = "haspaint.type_select"
@@ -4474,6 +4472,10 @@ class HAS_PT_LayersPanel(bpy.types.Panel):
                     row1 = rowd.row()
                     row1.label(text= "Invert G in Normal")
                     row1.prop(part, "InvertG", text="")
+                    # row1 = rowd.row()
+                    # row1.label(text= "Fix")
+                    # row1.prop(part, "colorfix", text="")
+                    
                     row = box.row(align=False)
                     row.label(text="Texture size")
                     txl = row.operator("haspaint.texture_size_add_subtract", text="", icon='ADD')
@@ -5144,9 +5146,10 @@ def uifilter(self, context, layer, filter, index, rowbox, lindex):
         op = row.operator("haspaint.filter_select", text="Select Filter", icon='BLANK1', emboss=False)
     op.layer_index = lindex
     op.filter_index = index
-
-    if filter.name == 'CUSTOM':
-        row.prop(filter, "custom_node_tree", text="", emboss=False)
+ 
+    if filter.name == 'CUSTOM' and filter.custom_node_tree_p and not filter.edit:
+        row.prop_search(filter, "custom_node_tree_p", bpy.data, "node_groups", text = "")
+        #row.prop(filter, "custom_node_tree", text="", emboss=False)
     otp = context.scene.other_props
 
     move_up = row.operator("haspaint.move_filter", text="", icon='TRIA_UP', emboss=False)
@@ -5171,7 +5174,7 @@ def uifilter(self, context, layer, filter, index, rowbox, lindex):
     
     if filter.edit:
         if filter.name == 'CUSTOM':
-            rowbox.prop(filter, "custom_node_tree", text="")
+            rowbox.prop_search(filter, "custom_node_tree_p", bpy.data, "node_groups", text = "")
             alt = True
         else:
             alt = False
@@ -5193,9 +5196,10 @@ def uifilter(self, context, layer, filter, index, rowbox, lindex):
             if node:
                 if filter.name == 'COLORRAMP':
                     rowbox.box().template_color_ramp(node, "color_ramp", expand=False)
-
+                elif filter.name == 'SEPARATERGB':
+                    alt = True
                 elif filter.name == 'LEVELS':
-                    drawlevels(filter.levels, rowbox, histogram_source = layer.resource.image.name, skipexpand = True)
+                    drawlevels(filter.levels, rowbox, histogram_source = layer.resource.image.name if layer.resource.image else None, skipexpand = True)
                     
                 elif filter.name == 'CURVERGB':
                     rowbox.box().template_curve_mapping(node, "mapping", type='COLOR', levels=False)
@@ -5309,6 +5313,8 @@ def uifilter(self, context, layer, filter, index, rowbox, lindex):
                     filnd = filter.displnode.get_node()
                     if filnd:
                         rowbox.prop(filnd.outputs[0], "default_value", text = "")
+                    if not filter.resource.image:
+                        rowbox.label(text="Create Object Normal Map before applying or exporting")
                     rowbox.template_ID(filter.resource, "image", text ="Object Normal Map")
                 
                 if not ignoreinputs:
@@ -5373,9 +5379,9 @@ def uiinputs(rowbox,node, layer, index, filter,lindex, alt):
         for ind, input_socket in enumerate(node.outputs):
             socket_type = input_socket.type
             socket_ui_type = socket_ui_mapping.get(socket_type)
-            filtersockets(input_socket, socket_ui_mapping, colout, ind, filter, layer, index, alt)
+            filtersockets(input_socket, socket_ui_mapping, colout, ind, filter, layer, index, alt, inp = False)
 
-def filtersockets(input_socket, socket_ui_mapping, col, ind, filter, layer, index, hide):
+def filtersockets(input_socket, socket_ui_mapping, col, ind, filter, layer, index, hide, inp = True):
     
     socket_type = input_socket.type
     socket_ui_type = socket_ui_mapping.get(socket_type)
@@ -5383,15 +5389,15 @@ def filtersockets(input_socket, socket_ui_mapping, col, ind, filter, layer, inde
 
         socket_id = f"{input_socket.name}_{ind}"
         rowc = col.row(align=False)
-
+        sc = filter.socket_in if inp else filter.socket_out
         rowc.enabled = not input_socket.is_linked
         if hide:
-            cinput = rowc.operator("haspaint.filter_inout", text="", icon="RADIOBUT_ON" if filter.socket_in == ind else "RADIOBUT_OFF", emboss=False)
+            cinput = rowc.operator("haspaint.filter_inout", text="", icon="RADIOBUT_ON" if sc == ind else "RADIOBUT_OFF", emboss=False)
             cinput.layer_index = layer.index
             cinput.filter_index = index
             cinput.inputind = ind
             
-            cinput.inpout = True
+            cinput.inpout = inp
         
         rowc.prop(input_socket, "default_value", text=input_socket.name, slider = True)
 
@@ -5822,12 +5828,14 @@ def create_layer_node(layer, pbr = False):
             lastconnection = gamma.outputs[0]
             links.new(image_node.outputs[0], gamma.inputs[0])
     math_node = create_node(node_group,'ShaderNodeMath', -200,0, "op", 'MULTIPLY')
-    
+
+    initialmask = None
     if layer.mask:
         initialmask = create_node(node_group,'ShaderNodeMath', -200,0, "op", 'MULTIPLY')
         initialmask.name = "InitialMask"
         initialmask.inputs[0].name = "MaskValue"
         set_default(initialmask, 0, 1.0 if layer.mask_value else 0.0)
+        set_default(initialmask, 1, 1.0)
         #layer.mask_value.set_socket_reference(initialmask.inputs[1])
     #else:
         #layer.mask_value.set_socket_reference(math_node.inputs[0])
@@ -5877,14 +5885,17 @@ def create_layer_node(layer, pbr = False):
                     lastconnection = image_node.outputs[0]
             lastclipmaskconnection = image_node.outputs[1]
     if layer.mask:
-        links.new(lastclipmaskconnection, initialmask.inputs[1])
-        lastclipmaskconnection = initialmask.outputs[0]
+        if initialmask and lastclipmaskconnection:
+            links.new(lastclipmaskconnection, initialmask.inputs[1])
+        if initialmask:
+            lastclipmaskconnection = initialmask.outputs[0]
     if active_filters:
         filnode = create_node(node_group,'ShaderNodeGroup', -200,-200, "cus", layer_filter(layer).name)
         set_default(filnode, 'Color', layer.resource.default_color)
         set_default(filnode, 'Alpha', 1.0)
         if lastconnection:
             links.new(lastconnection, filnode.inputs['Color'])
+        if lastclipmaskconnection:
             links.new(lastclipmaskconnection, filnode.inputs['Alpha']) 
         lastconnection = filnode.outputs["Color"]
         lastclipmaskconnection = filnode.outputs["Alpha"]
@@ -6059,8 +6070,7 @@ def layer_filter(layer, multi = False):
                 count = count+1
                 filternodename = None
                 filternode = None
-                coninp = filter.socket_in
-                conout = filter.socket_out
+                
                 if not filternodename:
                     filternodename = f"{getdescription(FILTERS, filter.name)}"
                 Op = None
@@ -6078,7 +6088,9 @@ def layer_filter(layer, multi = False):
 
                     continue
                 elif filter.name == 'CUSTOM':
-                    Op = f"{filter.custom_node_tree}"
+                    if not filter.custom_node_tree_p:
+                        continue
+                    Op = f"{filter.custom_node_tree_p.name}"
                     optype = 'cus'
                 elif filter.name == "PAINT":
 
@@ -6147,25 +6159,36 @@ def layer_filter(layer, multi = False):
                     
                     if not ignoresetup:
                         filternode = node_group.nodes.get(filter.node_name)
-
+                        if filternode:
+                            if filternode.type == 'GROUP' and not filternode.node_tree:
+                                filternode = None
                         if not filternode:
                             filternode = create_node(node_group, filternodename, -200,-200*count, optype, Op)
                             filter.node_name = filternode.name
+                            
                         else:
                             filternode.location = (-200,-200*count)
 
                         clear_node_socket_connections(filternode)
 
+                        check_filter_sockets(filter, filternode)
+
                         if filternode.inputs:
                             if "Color" in filternode.inputs:
                                 links.new(lastconnection, filternode.inputs["Color"])
                             else:
-                                if coninp:
-                                    links.new(lastconnection, filternode.inputs[coninp])
+                                if filter.socket_in:
+                                    links.new(lastconnection, filternode.inputs[filter.socket_in])
                                 else:
                                     links.new(lastconnection, filternode.inputs[0])
 
-                        templast = filternode.outputs[0]
+                        if filternode.outputs:
+                            if filter.socket_out:
+                                templast = filternode.outputs[filter.socket_out]
+                            else:
+                                templast = filternode.outputs[0]
+                        else:
+                            continue
                     if not ignoremix:
                         
                         vldmode = "MIX" if filter.blend_mode == "PASS" or filter.blend_mode =="COMBNRM" else filter.blend_mode
@@ -6645,6 +6668,8 @@ def UnlitNode():
     output_node = node_group.nodes.new(type='NodeGroupOutput')
     output_node.location = (500, 0)
 
+    set_default(node_group, "Alpha", 1.0)
+
     Note(node_group)
 
     fixtransp = create_node(node_group,'ShaderNodeMixRGB', 50,300, "mix", "MULTIPLY")
@@ -6659,10 +6684,13 @@ def UnlitNode():
     addshader.location = (50, 300)
 
     tree_links = node_group.links
-
-    tree_links.new(input_node.outputs["Color"], fixtransp.inputs[1])
-    tree_links.new(input_node.outputs["Alpha"], fixtransp.inputs[2])
-    tree_links.new(fixtransp.outputs[0], emission.inputs[0])
+    if part.colorfix:
+        tree_links.new(input_node.outputs["Color"], emission.inputs[0])
+    else:
+        tree_links.new(input_node.outputs["Color"], fixtransp.inputs[1])
+        tree_links.new(input_node.outputs["Alpha"], fixtransp.inputs[2])
+        tree_links.new(fixtransp.outputs[0], emission.inputs[0])
+    
     tree_links.new(input_node.outputs["Alpha"], invert.inputs[1])
     tree_links.new(invert.outputs[0], transparent.inputs[0])
 
@@ -6692,6 +6720,7 @@ def SetupMtl(material,part):
         tree_links.new(shader_node.outputs[0], output_node.inputs[0]) 
 
     elif part.shader_type == 'UNLIT':
+        UnlitNode()
         if not emit_node:
             emit_node = create_node(tree, 'ShaderNodeGroup' , output_node.location[0] -200,output_node.location[1], "cus", UnlitNode().name)
             emit_node.name = "HAS_Unlit"
@@ -6737,7 +6766,7 @@ def UpdateShader():
         input.hide = not input.hide
     for output in group_node.outputs:
         output.hide = not output.hide
-
+    clear_socket_links(shader_node, "Alpha")
     if part.shader_type == 'PRINCIPLED':
         if bpy.context.scene.other_props.preview_mode == "COMBINED":
             for type in getusedmaps():
@@ -6745,8 +6774,11 @@ def UpdateShader():
                 if nm:
                     if nm == "Diffuse":
                         tree_links.new(group_node.outputs[nm], shader_node.inputs["Base Color"])
+                        
                         if part.diffusealpha:
                             tree_links.new(group_node.outputs['DiffuseAlpha'], shader_node.inputs["Alpha"])
+                        elif typeexist("ALPHA"):
+                            tree_links.new(group_node.outputs['Alpha'], shader_node.inputs["Alpha"])
                     elif nm == "Height":
                         tree_links.new(group_node.outputs['Normal'], shader_node.inputs["Normal"])
                     else:
@@ -6762,9 +6794,9 @@ def UpdateShader():
                     
     elif part.shader_type == 'UNLIT':
         tree_links.new(group_node.outputs['Diffuse'], shader_node.inputs["Color"])
-        if part.diffusealpha or not typeexist("ALPHA"):
+        if part.diffusealpha:
             tree_links.new(group_node.outputs['DiffuseAlpha'], shader_node.inputs["Alpha"])
-        else:
+        elif typeexist("ALPHA"):
             tree_links.new(group_node.outputs['Alpha'], shader_node.inputs["Alpha"])
 
 def typeexist(Name):
@@ -6855,9 +6887,16 @@ def layersgroup(tex_type, name):
                 if invnrmnode:
                     links.new(prev_node.outputs['Color'], invnrmnode.inputs['Normal'])
                     links.new(invnrmnode.outputs['Normal'], group_output.inputs['Color'])
+        if part.colorfix and tex_type[0] == "DIFFUSE" and part.diffusealpha and not part.shader_type == "UNLIT":
+            Colfix = create_node(node_group,'ShaderNodeMixRGB', -200,0, "mix", 'DIVIDE')
+            set_default(Colfix, 0, 1.0)
+            links.new(prev_node.outputs['Color'], Colfix.inputs[1])
+            links.new(prev_node.outputs['Alpha'], Colfix.inputs[2])
+            links.new(Colfix.outputs[0], group_output.inputs['Color'])
     else:
         links.new(group_input.outputs['Color'], group_output.inputs['Color'])
         links.new(group_input.outputs['Alpha'], group_output.inputs['Alpha'])
+
 
     return node_group
 
@@ -6897,6 +6936,8 @@ def hasmatnode():
         nm = tex_type[1]
         anm = f'{nm}Alpha'
         create_node_sockets_from_string(node_group, f"<{nm}>(color), <{anm}>(float)",f"<{nm}>(color), <{anm}>(float)")
+        if not group_node.outputs or not group_node.inputs:
+            continue
         links.new(group_node.outputs['Color'], output_node.inputs[nm])
         links.new(group_node.outputs['Alpha'], output_node.inputs[anm])
         links.new(input_node.outputs[nm], group_node.inputs['Color'])
@@ -6912,6 +6953,8 @@ def hasmatnode():
             set_default(node_group, "Normal", (0.5,0.5,1.0,1.0))
         if type == "DIFFUSE":
             set_default(node_group, "Diffuse", (0.0,0.0,0.0,1.0))
+        if type == "ALPHA":
+            set_default(node_group, "Alpha", (1.0,1.0,1.0,1.0))
         if not type == "DIFFUSE":
             set_default(node_group, anm, 1.0)
 
@@ -9260,6 +9303,26 @@ def check_for_sockets(sockets, names):
             return False
     return True
 
+def get_custom_shader_groups():
+    enum_items = []
+    enum_items.append(('Empty', 'Empty', ''))
+    for node_group in bpy.data.node_groups:
+        if node_group.type == 'SHADER':
+            group_name = node_group.name
+            if not group_name.startswith("."):
+                enum_items.append((group_name, group_name, "Custom Shader Group Node"))
+    
+    if not enum_items:
+        enum_items.append(('NONE', 'None', 'No custom shader node groups found'))
+    
+    return enum_items
+
+def check_filter_sockets(filter, filternode):
+    if len(filternode.inputs)<=filter.socket_in:
+        filter.socket_in = 0
+    if len(filternode.outputs)<=filter.socket_out:
+        filter.socket_out = 0
+
 @contextmanager
 def temporary_scene_settings(settings):
     
@@ -9392,6 +9455,7 @@ classes = [
     RemoveAllBakeObjects,
     SetSortColorOperator,
     FilterProperty,
+
     BakeMapSettings,
     BakingProperties,
     LayerReference,
